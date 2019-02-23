@@ -39,14 +39,14 @@ OK
 ## Configuration file for leofs_bench
 ### An Example
 
-Some examples are included in LeoFS' repository at [leo-project / leofs / test / conf](https://github.com/leo-project/leofs/tree/master/test/conf). If you would like to learn basho_bench's configuration, you can see [BashoBench's Configuration](https://docs.basho.com/riak/kv/2.2.0/using/performance/benchmarking/#configuration).
+Some examples are included in LeoFS' repository at [leo-project / leofs / test / conf](https://github.com/leo-project/leofs/tree/master/test/conf).
 
 ```erlang
 {mode,      max}.
 {duration,   10}.
 {concurrent, 50}.
 
-{driver, basho_bench_driver_leofs}.
+{driver, leofs_bench_driver_leofs}.
 {code_paths, ["deps/ibrowse"]}.
 
 {http_raw_ips, ["${HOST_NAME_OF_LEOFS_GATEWAY}"]}.
@@ -79,7 +79,7 @@ In this example, LeoFS and `leofs_bench` are installed locally. The following co
 ```bash
 ### Loading 1M records of size 16KB
 cd leofs_bench
-./basho_bench ../leofs/test/conf/leofs_16K_LOAD1M.config
+./leofs_bench ../leofs/test/conf/leofs_16K_LOAD1M.config
 ```
 
 
@@ -113,7 +113,7 @@ You need to modify the values for `http_raw_ips` and `http_raw_port`.
 {duration,   10}.
 {concurrent, 50}.
 
-{driver, basho_bench_driver_leofs}.
+{driver, leofs_bench_driver_leofs}.
 {code_paths, ["deps/ibrowse"]}.
 
 {http_raw_ips, ["${HOST_NAME_OF_LEOFS_GATEWAY}"]}. %% able to set plural nodes
@@ -134,7 +134,7 @@ You need to modify the values for `http_raw_ips` and `http_raw_port`.
 ```bash
 ### Loading 1M records each size is 16KB
 cd leofs_bench
-./basho_bench ../leofs/test/conf/leofs_16K_LOAD1M.config
+./leofs_bench ../leofs/test/conf/leofs_16K_LOAD1M.config
 ```
 
 ## Related Links
