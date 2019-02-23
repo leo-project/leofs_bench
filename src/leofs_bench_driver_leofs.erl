@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% basho_bench: Benchmarking Suite
+%% leofs_bench: Benchmarking Suite
 %%
 %% Copyright (c) 2012 Rakuten, Inc.
 %%
@@ -19,37 +19,40 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(basho_bench_driver_leofs).
+-module(leofs_bench_driver_leofs).
 
 -export([new/1,
          run/4]).
 
--include("basho_bench.hrl").
+-include("leofs_bench.hrl").
 -include_lib("leo_s3_libs/include/leo_s3_auth.hrl").
 
 -record(url, {abspath, host, port, username, password, path, protocol, host_type}).
 
--record(state, { base_urls,          % Tuple of #url -- one for each IP
-                 base_urls_index,    % #url to use for next request
-                 path_params,        % Params to append on the path
-                 id,                 % Job ID passed through new/1 minus 1 -> 0... concurrent
-                 concurrent,         % Number of Job Processed
-                 value_source,       % source for a value generator
-                 value_size_groups,  % size groups for a value generator
-                 aws_chunk_size,     % aws-chunked Chunk Size
-                 aws_chunk_nohash,   % aws-chunked skip content SHA-256
-                 retry_on_overload,  % whether retry when LeoFS is overloaded (503)
-                 mp_part_size,       % Part Size for Multipart Upload
-                 mp_part_bin,        % Pre-gen Binary for Multipart Upload
-                 get_range,          % Range Get Range
-                 get_size_groups,    % Range Get Size Groups
-                 check_integrity}).  % Params to test data integrity
+-record(state, {
+        base_urls,          % Tuple of #url -- one for each IP
+        base_urls_index,    % #url to use for next request
+        path_params,        % Params to append on the path
+        id,                 % Job ID passed through new/1 minus 1 -> 0... concurrent
+        concurrent,         % Number of Job Processed
+        value_source,       % source for a value generator
+        value_size_groups,  % size groups for a value generator
+        aws_chunk_size,     % aws-chunked Chunk Size
+        aws_chunk_nohash,   % aws-chunked skip content SHA-256
+        retry_on_overload,  % whether retry when LeoFS is overloaded (503)
+        mp_part_size,       % Part Size for Multipart Upload
+        mp_part_bin,        % Pre-gen Binary for Multipart Upload
+        get_range,          % Range Get Range
+        get_size_groups,    % Range Get Size Groups
+        check_integrity     % Params to test data integrity
+    }).
 
--define(S3_ACC_KEY,      "05236").
--define(S3_SEC_KEY,      "802562235").
+-define(S3_ACC_KEY, "05236").
+-define(S3_SEC_KEY, "802562235").
 -define(S3_CONTENT_TYPE, "application/octet-stream").
 -define(ETS_BODY_MD5, ets_body_md5).
 -define(OL_SLEEP_INTERNVAL, 500).
+
 
 %% ====================================================================
 %% API
@@ -71,20 +74,20 @@ new(Id) ->
     application:start(ibrowse),
 
     %% The IPs, port and path we'll be testing
-    Ips  = basho_bench_config:get(http_raw_ips,      ["localhost"]),
-    Port = basho_bench_config:get(http_raw_port,     8080),
-    Path = basho_bench_config:get(http_raw_path,     "/test_bucket/_test"),
-    Params = basho_bench_config:get(http_raw_params, ""),
-    Disconnect = basho_bench_config:get(http_raw_disconnect_frequency, infinity),
-    
-    PartSize = basho_bench_config:get(mp_part_size, 0),
-    PartBin = crypto:rand_bytes(PartSize),
+    Ips  = leofs_bench_config:get(http_raw_ips, ["localhost"]),
+    Port = leofs_bench_config:get(http_raw_port, 8080),
+    Path = leofs_bench_config:get(http_raw_path, "/test_bucket/_test"),
+    Params = leofs_bench_config:get(http_raw_params, ""),
+    Disconnect = leofs_bench_config:get(http_raw_disconnect_frequency, infinity),
 
-    GetRange = basho_bench_config:get(get_range, {0, 104857599}),
-    GetSizeGroups = basho_bench_config:get(get_size_groups, [{1, 102400, 102400}]),
+    PartSize = leofs_bench_config:get(mp_part_size, 0),
+    PartBin = crypto:strong_rand_bytes(PartSize),
 
-    AccessKey = basho_bench_config:get(access_key, ?S3_ACC_KEY),
-    SecretKey = list_to_binary(basho_bench_config:get(secret_key, ?S3_SEC_KEY)),
+    GetRange = leofs_bench_config:get(get_range, {0, 104857599}),
+    GetSizeGroups = leofs_bench_config:get(get_size_groups, [{1, 102400, 102400}]),
+
+    AccessKey = leofs_bench_config:get(access_key, ?S3_ACC_KEY),
+    SecretKey = list_to_binary(leofs_bench_config:get(secret_key, ?S3_SEC_KEY)),
 
     erlang:put(access_key, AccessKey),
     erlang:put(secret_key, SecretKey),
@@ -109,31 +112,32 @@ new(Id) ->
         _ ->
             BaseUrls = list_to_tuple([ #url { host = Ip, port = Port, path = Path }
                                        || Ip <- Ips]),
-            BaseUrlsIndex = random:uniform(tuple_size(BaseUrls))
+            BaseUrlsIndex = rand:uniform(tuple_size(BaseUrls))
     end,
-    CI = basho_bench_config:get(
+    CI = leofs_bench_config:get(
            check_integrity, false), %% should be false when doing benchmark
-    VSG = basho_bench_config:get(
+    VSG = leofs_bench_config:get(
            value_size_groups, [{1, 4096, 8192},{1, 16384, 32768}]),
-    Concurrent = basho_bench_config:get(concurrent, 0),
-    AWSChunkSize = basho_bench_config:get(aws_chunk_size, 131072),
-    AWSChunkNoHash = basho_bench_config:get(aws_chunk_nohash, true),
-    RetryOnOL = basho_bench_config:get(retry_on_overload, false),
-    {ok, #state { base_urls = BaseUrls,
-                  base_urls_index = BaseUrlsIndex,
-                  path_params = Params,
-                  value_source = init_source(),
-                  value_size_groups = size_group_load_config(VSG, []),
-                  id = Id - 1,
-                  concurrent = Concurrent,
-                  aws_chunk_size = AWSChunkSize,
-                  aws_chunk_nohash = AWSChunkNoHash,
-                  retry_on_overload = RetryOnOL,
-                  mp_part_size = PartSize,
-                  mp_part_bin = PartBin,
-                  get_range = GetRange,
-                  get_size_groups = size_group_load_config(GetSizeGroups, []),
-                  check_integrity = CI }}.
+    Concurrent = leofs_bench_config:get(concurrent, 0),
+    AWSChunkSize = leofs_bench_config:get(aws_chunk_size, 131072),
+    AWSChunkNoHash = leofs_bench_config:get(aws_chunk_nohash, true),
+    RetryOnOL = leofs_bench_config:get(retry_on_overload, false),
+    {ok, #state {
+            base_urls = BaseUrls,
+            base_urls_index = BaseUrlsIndex,
+            path_params = Params,
+            value_source = init_source(),
+            value_size_groups = size_group_load_config(VSG, []),
+            id = Id - 1,
+            concurrent = Concurrent,
+            aws_chunk_size = AWSChunkSize,
+            aws_chunk_nohash = AWSChunkNoHash,
+            retry_on_overload = RetryOnOL,
+            mp_part_size = PartSize,
+            mp_part_bin = PartBin,
+            get_range = GetRange,
+            get_size_groups = size_group_load_config(GetSizeGroups, []),
+            check_integrity = CI}}.
 
 keygen_global_uniq(false, _Id, _Concurrent, KeyGen) ->
     KeyGen();
@@ -143,7 +147,7 @@ keygen_global_uniq(true, Id, Concurrent, KeyGen) ->
     Diff = Rem - Id,
     Base - Diff.
 
-run(get, KeyGen, _ValueGen, #state{check_integrity = CI, 
+run(get, KeyGen, _ValueGen, #state{check_integrity = CI,
                                    retry_on_overload = RetryOnOL,
                                    id = Id, concurrent = Concurrent} = State) ->
     Key = keygen_global_uniq(CI, Id, Concurrent, KeyGen),
@@ -170,7 +174,7 @@ run(get, KeyGen, _ValueGen, #state{check_integrity = CI,
             {error, Reason, S2}
     end;
 
-run(getv4, KeyGen, _ValueGen, #state{check_integrity = CI, 
+run(getv4, KeyGen, _ValueGen, #state{check_integrity = CI,
                                      retry_on_overload = RetryOnOL,
                                      id = Id, concurrent = Concurrent} = State) ->
     Key = keygen_global_uniq(CI, Id, Concurrent, KeyGen),
@@ -206,12 +210,12 @@ run(get_range, KeyGen, _ValueGen, #state{check_integrity = CI,
     {NextUrl, S2} = next_url(State),
     {Min, Max} = pick_random(GetSizeGroups),
     Size = case Max > Min of
-               true -> random:uniform(Max - Min + 1) + Min - 1;
+               true -> rand:uniform(Max - Min + 1) + Min - 1;
                _ -> Max
            end,
     {Start, End} = GetRange,
     Upper = End - Size,
-    Offset = random:uniform(Upper - Start + 1) + Start - 1,
+    Offset = rand:uniform(Upper - Start + 1) + Start - 1,
     Range = {Offset, Offset + Size - 1},
 
     case do_get(url(NextUrl, Key, State#state.path_params), RetryOnOL, Range) of
@@ -253,7 +257,7 @@ run(test, _KeyGen, _ValueGen, #state{value_source = VS,
 run(put, KeyGen, _ValueGen, #state{check_integrity = CI,
                                    retry_on_overload = RetryOnOL,
                                    value_source = VS,
-                                   value_size_groups = VSG, 
+                                   value_size_groups = VSG,
                                    id = Id,
                                    concurrent = Concurrent} = State) ->
     Key = keygen_global_uniq(CI, Id, Concurrent, KeyGen),
@@ -328,12 +332,12 @@ run(mp_put, KeyGen, _ValueGen, #state{retry_on_overload = RetryOnOL,
     Key = KeyGen(),
     {NextUrl, S2} = next_url(State),
     Url = url(NextUrl, Key, State#state.path_params),
-    
+
     Len = length(VSG),
-    Nth = random:uniform(Len),
+    Nth = rand:uniform(Len),
     {Min, Max} = lists:nth(Nth, VSG),
     Size = case Max > Min of
-        true -> random:uniform(Max - Min) + Min - 1;
+        true -> rand:uniform(Max - Min) + Min - 1;
         false -> Max
     end,
     case do_mp(Url, [], Size, PartSize, PartBin, RetryOnOL) of
@@ -343,7 +347,7 @@ run(mp_put, KeyGen, _ValueGen, #state{retry_on_overload = RetryOnOL,
             {error, Reason, S2}
     end;
 
-run(delete, KeyGen, _ValueGen, #state{check_integrity = CI, 
+run(delete, KeyGen, _ValueGen, #state{check_integrity = CI,
                                       retry_on_overload = RetryOnOL,
                                       id = Id, concurrent = Concurrent} = State) ->
     Key = keygen_global_uniq(CI, Id, Concurrent, KeyGen),
@@ -370,13 +374,13 @@ size_group_load_config([{Weight, Min, Max}|Rest], Acc) ->
     size_group_load_config(Rest, [List|Acc]).
 
 init_source() ->
-    SourceSz = basho_bench_config:get(?VAL_GEN_SRC_SIZE, 1048576),
-    {?VAL_GEN_SRC_SIZE, SourceSz, crypto:rand_bytes(SourceSz)}.
+    SourceSz = leofs_bench_config:get(?VAL_GEN_SRC_SIZE, 1048576),
+    {?VAL_GEN_SRC_SIZE, SourceSz, crypto:strong_rand_bytes(SourceSz)}.
 
 data_block({SourceCfg, SourceSz, Source}, BlockSize) ->
     case SourceSz - BlockSize > 0 of
         true ->
-            Offset = random:uniform(SourceSz - BlockSize),
+            Offset = rand:uniform(SourceSz - BlockSize),
             <<_:Offset/bytes, Slice:BlockSize/bytes, _Rest/binary>> = Source,
             Slice;
         false ->
@@ -387,14 +391,14 @@ data_block({SourceCfg, SourceSz, Source}, BlockSize) ->
 
 value_gen_with_size_groups(ValueSource, SizeGroups) ->
     Len = length(SizeGroups),
-    Nth = random:uniform(Len),
+    Nth = rand:uniform(Len),
     {Min, Max} = lists:nth(Nth, SizeGroups),
     Size = case Max > Min of
-        true -> random:uniform(Max - Min) + Min - 1;
+        true -> rand:uniform(Max - Min) + Min - 1;
         false -> Max
     end,
     {Nth, data_block(ValueSource, Size)}.
-   
+
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
@@ -631,21 +635,6 @@ compute_chunk(Bin, PrevSign, SignKey, NoHash, TS) ->
               Bin/binary, "\r\n">>,
     {Chunk, Sign}.
 
-%% do_post(Url, Headers, ValueGen) ->
-%%     case send_request(Url, Headers ++ [{'Content-Type', 'application/octet-stream'}],
-%%                       post, ValueGen(), [{response_format, binary}]) of
-%%         {ok, "200", _Header, _Body} ->
-%%             ok;
-%%         {ok, "201", _Header, _Body} ->
-%%             ok;
-%%         {ok, "204", _Header, _Body} ->
-%%             ok;
-%%         {ok, Code, _Header, _Body} ->
-%%             {error, {http_error, Code}};
-%%         {error, Reason} ->
-%%            {error, Reason}
-%%     end.
-
 do_delete(Url, RetryOnOL) ->
     TS = leo_date:now(),
     case send_request(Url, [{"date", leo_http:rfc1123_date(TS)}, {'Authorization', gen_sig("DELETE", Url, TS)}], delete, [], [{response_format, binary}]) of
@@ -715,13 +704,13 @@ should_disconnect_secs(Seconds, Url) ->
     Key = {last_disconnect, Url#url.host},
     case erlang:get(Key) of
         undefined ->
-            erlang:put(Key, erlang:now()),
+            erlang:put(Key, os:timestamp()),
             false;
         Time when is_tuple(Time) andalso size(Time) == 3 ->
-            Diff = timer:now_diff(erlang:now(), Time),
+            Diff = timer:now_diff(os:timestamp(), Time),
             if
                 Diff >= Seconds * 1000000 ->
-                    erlang:put(Key, erlang:now()),
+                    erlang:put(Key, os:timestamp()),
                     true;
                 true -> false
             end
@@ -731,7 +720,7 @@ clear_disconnect_freq(Url) ->
     case erlang:get(disconnect_freq) of
         infinity -> ok;
         {ops, _Count} -> erlang:put({ops_since_disconnect, Url#url.host}, 0);
-        _Seconds -> erlang:put({last_disconnect, Url#url.host}, erlang:now())
+        _Seconds -> erlang:put({last_disconnect, Url#url.host}, os:timestamp())
     end.
 
 send_request(Url, Headers, Method, Body, Options) ->
@@ -743,7 +732,7 @@ send_request(Url, Headers, Method, Body, Options, Count) ->
     Pid = connect(Url),
     case catch(ibrowse_http_client:send_req(
                  Pid, Url, Headers, Method, Body, Options,
-                 basho_bench_config:get(http_raw_request_timeout, 5000))) of
+                 leofs_bench_config:get(http_raw_request_timeout, 5000))) of
 
         {ok, Status, RespHeaders, RespBody} ->
             maybe_disconnect(Url),
@@ -862,8 +851,8 @@ complete_mp(Url, Headers, UploadId, RetryOnOL, Count, PartBinETag, LastETag) ->
     Bin = <<"<CompleteMultipartUpload>",
             EntriesBin/binary,
             "</CompleteMultipartUpload>">>,
-    
-    Url_2 = Url#url{ path = lists:concat([Url#url.path, 
+
+    Url_2 = Url#url{ path = lists:concat([Url#url.path,
                                           "?uploadId=",
                                           UploadId
                                          ])},
@@ -907,5 +896,6 @@ gen_mp_entries(Cur, Count, PartBinETag, LastETag, Acc) ->
 
 pick_random(List) ->
     Len = length(List),
-    Pick = random:uniform(Len),
+    Pick = rand:uniform(Len),
     lists:nth(Pick, List).
+

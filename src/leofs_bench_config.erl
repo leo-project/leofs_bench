@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% basho_bench: Benchmarking Suite
+%% leofs_bench: Benchmarking Suite
 %%
 %% Copyright (c) 2009-2010 Basho Techonologies
 %%
@@ -19,7 +19,7 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(basho_bench_config).
+-module(leofs_bench_config).
 -behaviour(gen_server).
 
 
@@ -38,11 +38,11 @@
 % Gen server callbacks
 -export([code_change/3, init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2]).
 
--include("basho_bench.hrl").
+-include("leofs_bench.hrl").
 
--record(basho_bench_config_state, {}).
+-record(leofs_bench_config_state, {}).
 
--type state() :: #basho_bench_config_state{}.
+-type state() :: #leofs_bench_config_state{}.
 %% ===================================================================
 %% Public API
 %% ===================================================================
@@ -117,7 +117,7 @@ normalize_ip_entry(IP, Normalized, DefaultPort) ->
 
 -spec init(term()) -> {ok, state()}.  
 init(_Args) ->
-    State = #basho_bench_config_state{},
+    State = #leofs_bench_config_state{},
     {ok, State}.
 
 -spec code_change(term(), state(), term()) -> {ok, state()}.
@@ -133,10 +133,10 @@ handle_call({load_files, FileNames}, _From, State) ->
     {reply, ok, State};
 
 handle_call({set, Key, Value}, _From, State) ->
-    application:set_env(basho_bench, Key, Value), 
+    application:set_env(leofs_bench, Key, Value), 
     {reply, ok, State};
 handle_call({get, Key}, _From, State) ->
-    Value = application:get_env(basho_bench, Key),
+    Value = application:get_env(leofs_bench, Key),
     {reply, Value, State}.
 
 handle_cast(_Cast, State) ->
@@ -156,5 +156,5 @@ set_keys_from_files(Files) ->
             notokay
     end || File <- Files ],
     FlatKVs = lists:flatten(KVs),
-    [application:set_env(basho_bench, Key, Value) || {Key, Value} <- FlatKVs].
+    [application:set_env(leofs_bench, Key, Value) || {Key, Value} <- FlatKVs].
 

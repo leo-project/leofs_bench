@@ -1,9 +1,9 @@
--module(basho_bench_driver_s3cmd).
+-module(leofs_bench_driver_s3cmd).
 
 -export([new/1,
          run/4]).
 
--include("basho_bench.hrl").
+-include("leofs_bench.hrl").
 
 -record(state, { hosts,
                  path,
@@ -15,14 +15,14 @@
                  pick_groups }).
 
 new(Id) ->
-    Hosts = basho_bench_config:get(hosts,   ["192.168.100.35:8080"]),
-    Path  = basho_bench_config:get(path,    "/test"),
-    S3Cmd = basho_bench_config:get(s3cmd,   "~/s3cmd-1.6.1/s3cmd"),
-    TmpPath    = basho_bench_config:get(tmp_path,       "/dev/shm"),
-    PartSizeMB = basho_bench_config:get(part_size_mb,   5),
-    AccessKey  = basho_bench_config:get(access_key,     "05236"),
-    SecretKey  = basho_bench_config:get(secret_key,     "802562235"),
-    SizeGroups = basho_bench_config:get(size_groups,    [{1, 1000000000}]),
+    Hosts = leofs_bench_config:get(hosts,   ["192.168.100.35:8080"]),
+    Path  = leofs_bench_config:get(path,    "/test"),
+    S3Cmd = leofs_bench_config:get(s3cmd,   "~/s3cmd-1.6.1/s3cmd"),
+    TmpPath    = leofs_bench_config:get(tmp_path,       "/dev/shm"),
+    PartSizeMB = leofs_bench_config:get(part_size_mb,   5),
+    AccessKey  = leofs_bench_config:get(access_key,     "05236"),
+    SecretKey  = leofs_bench_config:get(secret_key,     "802562235"),
+    SizeGroups = leofs_bench_config:get(size_groups,    [{1, 1000000000}]),
 
     PickGroups = convert_size_groups_to_pick_groups(SizeGroups, 0, []),
     case Id of
@@ -98,7 +98,7 @@ run(get, KeyGen, _ValueGen, #state{hosts = Hosts,
 
 pick_random(List) ->
     Len = length(List),
-    Pick = random:uniform(Len),
+    Pick = rand:uniform(Len),
     lists:nth(Pick, List).
 
 convert_size_groups_to_pick_groups([], _, Acc) ->

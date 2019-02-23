@@ -1,7 +1,8 @@
 ebin/
 deps/
 tests/
-basho_bench
+leofs_bench
+.rebar
 *~
 #*#
 

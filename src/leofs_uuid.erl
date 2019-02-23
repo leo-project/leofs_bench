@@ -28,12 +28,15 @@
 % NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 % SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 %
--module(basho_uuid).
+-module(leofs_uuid).
 -export([v4/0, to_string/1, get_parts/1, to_binary/1]).
 
 % Generates a random binary UUID.
 v4() ->
-  v4(random:uniform(round(math:pow(2, 48))) - 1, random:uniform(round(math:pow(2, 12))) - 1, random:uniform(round(math:pow(2, 32))) - 1, random:uniform(round(math:pow(2, 30))) - 1).
+  v4(rand:uniform(round(math:pow(2, 48))) - 1,
+     rand:uniform(round(math:pow(2, 12))) - 1,
+     rand:uniform(round(math:pow(2, 32))) - 1,
+     rand:uniform(round(math:pow(2, 30))) - 1).
 v4(R1, R2, R3, R4) ->
     <<R1:48, 4:4, R2:12, 2:2, R3:32, R4: 30>>.
 

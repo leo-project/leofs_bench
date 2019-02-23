@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% basho_bench_measurement_erlangvm: Measurement Driver for Erlang VMs.
+%% leofs_bench_measurement_erlangvm: Measurement Driver for Erlang VMs.
 %%
 %% Copyright (c) 2009 Basho Techonologies
 %%
@@ -19,12 +19,12 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(basho_bench_measurement_erlangvm).
+-module(leofs_bench_measurement_erlangvm).
 
 -export([new/0,
          run/2]).
 
--include("basho_bench.hrl").
+-include("leofs_bench.hrl").
 
 -record(state, {
           nodes
@@ -36,7 +36,7 @@
 
 new() ->
     %% Try to spin up net_kernel
-    MyNode  = basho_bench_config:get(mynode, [basho_bench, longnames]),
+    MyNode  = leofs_bench_config:get(mynode, [leofs_bench, longnames]),
     case net_kernel:start(MyNode) of
         {ok, _} ->
             ?INFO("Net kernel started as ~p\n", [node()]);
@@ -46,8 +46,8 @@ new() ->
             ?FAIL_MSG("Failed to start net_kernel for ~p: ~p\n", [?MODULE, Reason])
     end,
 
-    Nodes = basho_bench_config:get(nodes),
-    Cookie = basho_bench_config:get(cookie),
+    Nodes = leofs_bench_config:get(nodes),
+    Cookie = leofs_bench_config:get(cookie),
 
     %% Initialize cookie for each of the nodes
     [true = erlang:set_cookie(N, Cookie) || N <- Nodes],

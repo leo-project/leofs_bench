@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% basho_bench: Benchmarking Suite
+%% leofs_bench: Benchmarking Suite
 %%
 %% Copyright (c) 2009-2012 Basho Techonologies
 %%
@@ -19,10 +19,10 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(basho_bench).
+-module(leofs_bench).
 
 -export([main/1, md5/1]).
--include("basho_bench.hrl").
+-include("leofs_bench.hrl").
 
 %% ====================================================================
 %% API
@@ -33,7 +33,7 @@ cli_options() ->
      {help, $h, "help", undefined, "Print usage"},
      {results_dir, $d, "results-dir", string, "Base directory to store test results, defaults to ./tests"},
      {bench_name, $n, "bench-name", string, "Name to identify the run, defaults to timestamp"},
-     {net_node,   $N, "node",   atom, "Erlang long node name of local node (initiating basho_bench)"},
+     {net_node,   $N, "node",   atom, "Erlang long node name of local node (initiating leofs_bench)"},
      {net_cookie, $C, "cookie", {atom, benchmark}, "Erlang network distribution magic cookie"},
      {net_join,   $J, "join",   atom, "Erlang long node name of remote node (to join to)"}
     ].
@@ -47,17 +47,17 @@ main(Args) ->
     TestDir = test_dir(Opts, BenchName),
 
     %% Load baseline configs
-    case application:load(basho_bench) of
+    case application:load(leofs_bench) of
         ok -> ok;
-        {error, {already_loaded, basho_bench}} -> ok
+        {error, {already_loaded, leofs_bench}} -> ok
     end,
-    register(basho_bench, self()),
+    register(leofs_bench, self()),
     %% TODO: Move into a proper supervision tree, janky for now
-    {ok, _Pid} = basho_bench_config:start_link(),
-    basho_bench_config:set(test_id, BenchName),
+    {ok, _Pid} = leofs_bench_config:start_link(),
+    leofs_bench_config:set(test_id, BenchName),
 
     application:load(lager),
-    ConsoleLagerLevel = basho_bench_config:get(log_level, debug),
+    ConsoleLagerLevel = leofs_bench_config:get(log_level, debug),
     ErrorLog = filename:join([TestDir, "error.log"]),
     ConsoleLog = filename:join([TestDir, "console.log"]),
     CrashLog = filename:join([TestDir, "crash.log"]),
@@ -72,19 +72,19 @@ main(Args) ->
 
     %% Make sure this happens after starting lager or failures wont
     %% show.
-    basho_bench_config:load(Configs),
+    leofs_bench_config:load(Configs),
 
     %% Log level can be overriden by the config files
-    CustomLagerLevel = basho_bench_config:get(log_level),
+    CustomLagerLevel = leofs_bench_config:get(log_level),
     lager:set_loglevel(lager_console_backend, CustomLagerLevel),
     lager:set_loglevel(lager_file_backend, ConsoleLog, CustomLagerLevel),
 
     %% Init code path
-    add_code_paths(basho_bench_config:get(code_paths, [])),
+    add_code_paths(leofs_bench_config:get(code_paths, [])),
 
     %% If a source directory is specified, compile and load all .erl files found
     %% there.
-    case basho_bench_config:get(source_dir, []) of
+    case leofs_bench_config:get(source_dir, []) of
         [] ->
             ok;
         SourceDir ->
@@ -94,7 +94,7 @@ main(Args) ->
     %% Copy the config into the test dir for posterity
     [ begin {ok, _} = file:copy(Config, filename:join(TestDir, filename:basename(Config))) end
       || Config <- Configs ],
-    case basho_bench_config:get(distribute_work, false) of 
+    case leofs_bench_config:get(distribute_work, false) of 
         true -> setup_distributed_work();
         false -> ok
     end,
@@ -105,12 +105,12 @@ main(Args) ->
     %% Run pre_hook for user code preconditions
     run_pre_hook(),
     %% Spin up the application
-    ok = basho_bench_app:start(),
+    ok = leofs_bench_app:start(),
 
     %% Pull the runtime duration from the config and sleep until that's passed OR
     %% the supervisor process exits
-    Mref = erlang:monitor(process, whereis(basho_bench_sup)),
-    DurationMins = basho_bench_config:get(duration),
+    Mref = erlang:monitor(process, whereis(leofs_bench_sup)),
+    DurationMins = leofs_bench_config:get(duration),
     wait_for_stop(Mref, DurationMins).
 
 
@@ -194,13 +194,13 @@ wait_for_stop(Mref, DurationMins) ->
             ?CONSOLE("Test stopped: ~p\n", [Info]);
         {shutdown, Reason, Exit} ->
             run_post_hook(),
-            basho_bench_app:stop(),
+            leofs_bench_app:stop(),
             ?CONSOLE("Test shutdown: ~s~n", [Reason]),
             halt(Exit)
 
     after Duration ->
             run_post_hook(),
-            basho_bench_app:stop(),
+            leofs_bench_app:stop(),
             ?CONSOLE("Test completed after ~p mins.\n", [DurationMins])
     end.
 
@@ -244,11 +244,11 @@ user_friendly_bytes(Size) ->
                 {Size, bytes}, ['KB', 'MB', 'GB']).
 
 log_dimensions() ->
-    case basho_bench_keygen:dimension(basho_bench_config:get(key_generator)) of
+    case leofs_bench_keygen:dimension(leofs_bench_config:get(key_generator)) of
         undefined ->
             ok;
         Keyspace ->
-            Valspace = basho_bench_valgen:dimension(basho_bench_config:get(value_generator), Keyspace),
+            Valspace = leofs_bench_valgen:dimension(leofs_bench_config:get(value_generator), Keyspace),
             {Size, Desc} = user_friendly_bytes(Valspace),
             ?INFO("Est. data size: ~.2f ~s\n", [Size, Desc])
     end.
@@ -269,10 +269,10 @@ load_source_files(Dir) ->
     filelib:fold_files(Dir, ".*.erl", false, CompileFn, ok).
 
 run_pre_hook() ->
-    run_hook(basho_bench_config:get(pre_hook, no_op)).
+    run_hook(leofs_bench_config:get(pre_hook, no_op)).
 
 run_post_hook() ->
-    run_hook(basho_bench_config:get(post_hook, no_op)).
+    run_hook(leofs_bench_config:get(post_hook, no_op)).
 
 run_hook({Module, Function}) ->
     Module:Function();
@@ -299,7 +299,7 @@ setup_distributed_work() ->
     erl_boot_server:add_subnet({0,0,0,0}, {0,0,0,0}),
     %% This is cheating, horribly, but it's the only simple way to bypass net_adm:host_file()
     gen_server:start({global, pool_master}, pool, [], []),
-    RemoteSpec = basho_bench_config:get(remote_nodes, []),
+    RemoteSpec = leofs_bench_config:get(remote_nodes, []),
     Cookie = lists:flatten(erlang:atom_to_list(erlang:get_cookie())),
     Args = "-setcookie " ++ Cookie ++ " -loader inet -hosts " ++ get_addr_args(),
     Slaves = [ slave:start_link(Host, Name, Args) || {Host, Name} <- RemoteSpec],
@@ -307,12 +307,12 @@ setup_distributed_work() ->
     [pool:attach(SlaveName) || SlaveName <- SlaveNames],
     CodePaths = code:get_path(),
     rpc:multicall(SlaveNames, code, set_path, [CodePaths]),
-    Apps = [lager, basho_bench, getopt, bear, folsom, ibrowse, riakc, riak_pb, mochiweb, protobuffs, velvet, goldrush],
+    Apps = [lager, leofs_bench, getopt, bear, folsom, ibrowse, riakc, riak_pb, mochiweb, protobuffs, velvet, goldrush],
     [distribute_app(App) || App <- Apps].
 
 
 deploy_module(Module) ->
-    case basho_bench_config:get(distribute_work, false) of 
+    case leofs_bench_config:get(distribute_work, false) of 
         true -> 
             Nodes = nodes(),
             {Module, Binary, Filename} = code:get_object_code(Module),
@@ -344,11 +344,6 @@ distribute_app(App) ->
     end,
     lists:foreach(EbinDirDistributeFun, EbinsDir),    
     ok.
-%% just a utility, should be in basho_bench_utils.erl
-%% but 's' is for multiple utilities, and so far this
-%% is the only one.
--ifdef(new_hash).
-md5(Bin) -> crypto:hash(md5, Bin).
--else.
-md5(Bin) -> crypto:md5(Bin).
--endif.
+
+md5(Bin) ->
+    crypto:hash(md5, Bin).

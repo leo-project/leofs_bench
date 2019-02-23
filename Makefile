@@ -13,7 +13,7 @@ clean:
 	@./rebar clean
 
 distclean: clean
-	@rm -rf basho_bench deps
+	@rm -rf leofs_bench deps
 
 results:
 	Rscript --vanilla priv/summary.r -i tests/current

@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% basho_bench: Benchmarking Suite
+%% leofs_bench: Benchmarking Suite
 %%
 %% Copyright (c) 2009-2010 Basho Techonologies
 %%
@@ -19,14 +19,14 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(basho_bench_keygen).
+-module(leofs_bench_keygen).
 
 -export([new/2,
          dimension/1,
          sequential_int_generator/4]).
 -export([reset_sequential_int_state/0]).        % Internal driver use only.
 
--include("basho_bench.hrl").
+-include("leofs_bench.hrl").
 
 %% Use a fixed shape for Pareto that will yield the desired 80/20
 %% ratio of generated values.
@@ -82,13 +82,13 @@ new({sequential_int, MaxKey}, Id)
           "For most use cases, 'partitioned_sequential_int' is the better choice.\n", []),
     Ref = make_ref(),
     DisableProgress =
-        basho_bench_config:get(disable_sequential_int_progress_report, false),
+        leofs_bench_config:get(disable_sequential_int_progress_report, false),
     fun() -> sequential_int_generator(Ref, MaxKey, Id, DisableProgress) end;
 new({partitioned_sequential_int, MaxKey}, Id) ->
     new({partitioned_sequential_int, 0, MaxKey}, Id);
 new({partitioned_sequential_int, StartKey, NumKeys}, Id)
   when is_integer(StartKey), is_integer(NumKeys), NumKeys > 0 ->
-    Workers = basho_bench_config:get(concurrent),
+    Workers = leofs_bench_config:get(concurrent),
     Range = NumKeys div Workers,
     MinValue = StartKey + Range * (Id - 1),
     MaxValue = StartKey +
@@ -96,15 +96,15 @@ new({partitioned_sequential_int, StartKey, NumKeys}, Id)
                case Workers == Id of true-> NumKeys; false -> Range * Id end,
     Ref = make_ref(),
     DisableProgress =
-        basho_bench_config:get(disable_sequential_int_progress_report, false),
+        leofs_bench_config:get(disable_sequential_int_progress_report, false),
     ?DEBUG("ID ~p generating range ~p to ~p\n", [Id, MinValue, MaxValue]),
     fun() -> sequential_int_generator(Ref, MaxValue - MinValue, Id, DisableProgress) + MinValue end;
 new({uniform_int, MaxKey}, _Id)
   when is_integer(MaxKey), MaxKey > 0 ->
-    fun() -> random:uniform(MaxKey) end;
+    fun() -> rand:uniform(MaxKey) end;
 new({uniform_int, StartKey, NumKeys}, _Id)
   when is_integer(StartKey), is_integer(NumKeys), NumKeys > 0 ->
-    fun() -> random:uniform(NumKeys) + StartKey - 1 end;
+    fun() -> rand:uniform(NumKeys) + StartKey - 1 end;
 new({pareto_int, MaxKey}, _Id)
   when is_integer(MaxKey), MaxKey > 0 ->
     pareto(trunc(MaxKey * 0.2), ?PARETO_SHAPE);
@@ -124,7 +124,7 @@ new({function, Module, Function, Args}, Id)
 %% Adapt a value generator. The function keygen would work if Id was added as 
 %% the last parameter. But, alas, it is added as the first.
 new({valgen, ValGen}, Id) ->
-    basho_bench_valgen:new(ValGen, Id);
+    leofs_bench_valgen:new(ValGen, Id);
 new(Bin, _Id) when is_binary(Bin) ->
     fun() -> Bin end;
 new(Other, _Id) ->
@@ -167,7 +167,7 @@ pareto(Mean, Shape) ->
     S1 = (-1 / Shape),
     S2 = Mean * (Shape - 1),
     fun() ->
-            U = 1 - random:uniform(),
+            U = 1 - rand:uniform(),
             trunc((math:pow(U, S1) - 1) * S2)
     end.
 
@@ -244,7 +244,7 @@ seq_gen_read_resume_value(Id, MaxValue) ->
 seq_gen_state_dir(Id) ->
     Key = sequential_int_state_dir,
     DirValid = get(seq_dir_test_res),
-    case {basho_bench_config:get(Key, "") , DirValid} of
+    case {leofs_bench_config:get(Key, "") , DirValid} of
         {_Dir, false} ->
             "";
         {[$/|_] = Dir, true} ->

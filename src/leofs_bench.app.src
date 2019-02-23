@@ -1,18 +1,18 @@
-{application, basho_bench,
- [{description, "Riak Benchmarking Suite"},
+{application, leofs_bench,
+ [{description, "LeoFS' Benchmarking Suite"},
   {vsn, "0.9"},
   {modules, []},
-  {registered, [ basho_bench_sup ]},
+  {registered, []},
   {applications, [kernel,
                   stdlib,
                   lager,
                   sasl]},
-  {mod, {basho_bench_app, []}},
+  {mod, {leofs_bench_app, []}},
   {env, [
-	 %% Run mode: How should basho_bench started as a separate node, or part of an 
-	 %% other node. The default is standalone, other option is included.
-	 {app_run_mode, standalone},
-	 
+         %% Run mode: How should leofs_bench started as a separate node, or part of an 
+         %% other node. The default is standalone, other option is included.
+         {app_run_mode, standalone},
+
          %%
          %% Mode of load generation:
          %% max - Generate as many requests as possible per worker
@@ -41,19 +41,6 @@
          {concurrent, 3},
 
          %%
-         %% Driver module for the current test
-         %%
-         {driver, basho_bench_driver_http_raw},
-
-         %%
-         %% Operations (and associated mix). Note that
-         %% the driver may not implement every operation.
-         %%
-         {operations, [{get, 4},
-                       {put, 4},
-                       {delete, 1}]},
-
-         %%
          %% Interval on which to report latencies and status (seconds)
          %%
          {report_interval, 10},
@@ -72,4 +59,4 @@
          %%
          {value_generator, {fixed_bin, 100}}
         ]}
-]}.
+ ]}.

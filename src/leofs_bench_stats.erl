@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% basho_bench: Benchmarking Suite
+%% leofs_bench: Benchmarking Suite
 %%
 %% Copyright (c) 2009-2010 Basho Techonologies
 %%
@@ -16,10 +16,10 @@
 %% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 %% KIND, either express or implied.  See the License for the
 %% specific language governing permissions and limitations
-%% under the License.    
+%% under the License.
 %%
 %% -------------------------------------------------------------------
--module(basho_bench_stats).
+-module(leofs_bench_stats).
 
 -behaviour(gen_server).
 
@@ -33,7 +33,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
--include("basho_bench.hrl").
+-include("leofs_bench.hrl").
 
 -record(state, { ops,
                  start_time = os:timestamp(),
@@ -53,7 +53,7 @@ start_link() ->
     gen_server:start_link({global, ?MODULE}, ?MODULE, [], []).
 
 exponential(Lambda) ->
-    -math:log(random:uniform()) / Lambda.
+    -math:log(rand:uniform()) / Lambda.
 
 run() ->
     gen_server:call({global, ?MODULE}, run).
@@ -88,30 +88,30 @@ init([]) ->
 
     %% Initialize an ETS table to track error and crash counters during
     %% reporting interval
-    ets:new(basho_bench_errors, [protected, named_table]),
+    ets:new(leofs_bench_errors, [protected, named_table]),
 
     %% Initialize an ETS table to track error and crash counters since
     %% the start of the run
-    ets:new(basho_bench_total_errors, [protected, named_table]),
+    ets:new(leofs_bench_total_errors, [protected, named_table]),
 
     %% Get the list of operations we'll be using for this test
     F1 =
         fun({OpTag, _Count}) -> {OpTag, OpTag};
            ({Label, OpTag, _Count}) -> {Label, OpTag}
         end,
-    Ops = [F1(X) || X <- basho_bench_config:get(operations, [])],
+    Ops = [F1(X) || X <- leofs_bench_config:get(operations, [])],
 
     %% Get the list of measurements we'll be using for this test
     F2 =
         fun({MeasurementTag, _IntervalMS}) -> {MeasurementTag, MeasurementTag};
            ({Label, MeasurementTag, _IntervalMS}) -> {Label, MeasurementTag}
         end,
-    Measurements = [F2(X) || X <- basho_bench_config:get(measurements, [])],
+    Measurements = [F2(X) || X <- leofs_bench_config:get(measurements, [])],
 
     %% Setup a histogram and counter for each operation -- we only track latencies on
     %% successful operations
     [begin
-         folsom_metrics:new_histogram({latencies, Op}, slide, basho_bench_config:get(report_interval)),
+         folsom_metrics:new_histogram({latencies, Op}, slide, leofs_bench_config:get(report_interval)),
          folsom_metrics:new_counter({units, Op})
      end || Op <- Ops ++ Measurements],
 
@@ -131,7 +131,7 @@ init([]) ->
     file:write(ErrorsFile, <<"\"error\",\"count\"\n">>),
 
     %% Schedule next write/reset of data
-    ReportInterval = timer:seconds(basho_bench_config:get(report_interval)),
+    ReportInterval = timer:seconds(leofs_bench_config:get(report_interval)),
 
     {ok, #state{ ops = Ops ++ Measurements,
                  report_interval = ReportInterval,
@@ -154,7 +154,7 @@ handle_cast({Op, {ok, Units}, ElapsedUs}, State = #state{last_write_time = LWT, 
     TimeSinceLastWarn = timer:now_diff(Now, State#state.last_warn) / 1000,
     if
         TimeSinceLastReport > (RI * 2) andalso TimeSinceLastWarn > ?WARN_INTERVAL  ->
-            ?WARN("basho_bench_stats has not reported in ~.2f milliseconds\n", [TimeSinceLastReport]),
+            ?WARN("leofs_bench_stats has not reported in ~.2f milliseconds\n", [TimeSinceLastReport]),
             {message_queue_len, QLen} = process_info(self(), message_queue_len),
             ?WARN("stats process mailbox size = ~w\n", [QLen]),
             NewState = State#state{last_warn = Now};
@@ -200,7 +200,7 @@ code_change(_OldVsn, State, _Extra) ->
 get_distributed() ->
     case erlang:get(distribute_work) of
         undefined ->
-            DistributeWork = basho_bench_config:get(distribute_work, false),
+            DistributeWork = leofs_bench_config:get(distribute_work, false),
             erlang:put(distribute_work, DistributeWork),
             DistributeWork;
         DistributeWork ->
@@ -242,7 +242,7 @@ replace_special_chars([]) ->
     [].
 
 increment_error_counter(Key) ->
-    ets_increment(basho_bench_errors, Key, 1).
+    ets_increment(leofs_bench_errors, Key, 1).
 
 ets_increment(Tab, Key, Incr) when is_integer(Incr) ->
     %% Increment the counter for this specific key. We have to deal with
@@ -267,7 +267,7 @@ ets_increment(Tab, Key, Incr) when is_float(Incr) ->
     true = ets:insert(Tab, {Key, Old + Incr}).
 
 error_counter(Key) ->
-    lookup_or_zero(basho_bench_errors, Key).
+    lookup_or_zero(leofs_bench_errors, Key).
 
 lookup_or_zero(Tab, Key) ->
     case catch(ets:lookup_element(Tab, Key, 2)) of
@@ -308,10 +308,10 @@ process_stats(Now, State) ->
     %% Dump current error counts to console
     case (State#state.errors_since_last_report) of
         true ->
-            ErrCounts = ets:tab2list(basho_bench_errors),
-            true = ets:delete_all_objects(basho_bench_errors),
+            ErrCounts = ets:tab2list(leofs_bench_errors),
+            true = ets:delete_all_objects(leofs_bench_errors),
             ?INFO("Errors:~p\n", [lists:sort(ErrCounts)]),
-            [ets_increment(basho_bench_total_errors, Err, Count) || 
+            [ets_increment(leofs_bench_total_errors, Err, Count) ||
                               {Err, Count} <- ErrCounts],
             ok;
         false ->
@@ -351,8 +351,8 @@ report_latency(Elapsed, Window, Op) ->
     ok = file:write(erlang:get({csv_file, Op}), Line),
     {Units, Errors}.
 
-report_total_errors(State) ->                          
-    case ets:tab2list(basho_bench_total_errors) of
+report_total_errors(State) ->
+    case ets:tab2list(leofs_bench_total_errors) of
         [] ->
             ?INFO("No Errors.\n", []);
         UnsortedErrCounts ->
@@ -364,7 +364,7 @@ report_total_errors(State) ->
                                 ok; % per op total
                             false ->
                                 ?INFO("  ~p: ~p\n", [Key, Count]),
-                                file:write(State#state.errors_file, 
+                                file:write(State#state.errors_file,
                                            io_lib:format("\"~w\",\"~w\"\n",
                                                          [Key, Count]))
                         end

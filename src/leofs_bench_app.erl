@@ -1,8 +1,9 @@
 %% -------------------------------------------------------------------
 %%
-%% basho_bench: Benchmarking Suite
+%% leofs_bench: Benchmarking Suite
 %%
 %% Copyright (c) 2009-2010 Basho Techonologies
+%% Copyright (c) 2019- Lions Data
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -19,7 +20,7 @@
 %% under the License.    
 %%
 %% -------------------------------------------------------------------
--module(basho_bench_app).
+-module(leofs_bench_app).
 
 -behaviour(application).
 
@@ -39,14 +40,14 @@
 
 start() ->
     %% Redirect all SASL logging into a text file
-    case application:get_env(basho_bench,app_run_mode) of
+    case application:get_env(leofs_bench,app_run_mode) of
        {ok, included} ->
           %%Make sure sasl and crypto is available
           true=lists:keymember(sasl,1,application:which_applications()),
           true=lists:keymember(crypto,1,application:which_applications()),
           
           %% Start up our application
-          application:start(basho_bench);
+          application:start(leofs_bench);
        NotInc when NotInc == {ok, standalone} orelse NotInc == undefined ->
           application:load(sasl),
           application:set_env(sasl, sasl_error_logger, {file, "log.sasl.txt"}),
@@ -55,21 +56,21 @@ start() ->
 
           %% Start up our application -- mark it as permanent so that the node
           %% will be killed if we go down
-          application:start(basho_bench, permanent)
+          application:start(leofs_bench, permanent)
     end.
 
 stop() ->
-    application:stop(basho_bench).
+    application:stop(leofs_bench).
 
 is_running() ->
-    application:get_env(basho_bench_app, is_running) == {ok, true}.
+    application:get_env(leofs_bench_app, is_running) == {ok, true}.
 
 stop_or_kill() ->
     %% If running standalone, halt and kill node.  Otherwise, just
     %% kill top supervisor.
-    case application:get_env(basho_bench,app_run_mode) of
+    case application:get_env(leofs_bench,app_run_mode) of
         {ok, included} ->
-            exit(whereis(basho_bench_sup),kill);
+            exit(whereis(leofs_bench_sup),kill);
         _ ->
             init:stop(1)
     end.
@@ -80,12 +81,12 @@ stop_or_kill() ->
 
 start(_StartType, _StartArgs) ->
     %% TODO: Move into a proper supervision tree, janky for now
-    basho_bench_config:start_link(),
-    {ok, Pid} = basho_bench_sup:start_link(),
-    application:set_env(basho_bench_app, is_running, true),
-    ok = basho_bench_stats:run(),
-    ok = basho_bench_measurement:run(),
-    ok = basho_bench_worker:run(basho_bench_sup:workers()),
+    leofs_bench_config:start_link(),
+    {ok, Pid} = leofs_bench_sup:start_link(),
+    application:set_env(leofs_bench_app, is_running, true),
+    ok = leofs_bench_stats:run(),
+    ok = leofs_bench_measurement:run(),
+    ok = leofs_bench_worker:run(leofs_bench_sup:workers()),
     {ok, Pid}.
 
 
