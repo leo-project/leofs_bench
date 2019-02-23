@@ -5,7 +5,7 @@ We provide a benchmark tool specialized for LeoFS and we benchmark using it sinc
 ## Setting up leofs_bench
 ### Installation
 
-* [Basho leofs_bench’s repository](https://github.com/leo-project/leofs_bench)
+* [leofs_bench’s repository](https://github.com/leo-project/leofs_bench)
 * Use the following commands to set leofs_bench.
 
 
@@ -74,7 +74,7 @@ Some examples are included in LeoFS' repository at [leo-project / leofs / test /
 
 ## Running leofs_bench (1)
 
-In this example, LeoFS and `basho_bench` are installed locally. The following commands can be used to run `basho_bench`.
+In this example, LeoFS and `leofs_bench` are installed locally. The following commands can be used to run `leofs_bench`.
 
 ```bash
 ### Loading 1M records of size 16KB
